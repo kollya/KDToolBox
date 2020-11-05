@@ -1,7 +1,7 @@
 /****************************************************************************
 **                                MIT License
 **
-** Copyright (c) 2018-2019 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+** Copyright (C) 2018-2020 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
 ** Author: André Somers <andre.somers@kdab.com>
 **
 ** This file is part of KDToolBox (https://github.com/KDAB/KDToolBox).
@@ -53,21 +53,27 @@
 // by using @ref ModelAdapter.
 // The Iterator is a bi-directional iterator. This has an impact over the efficiency of some algorithms
 // over using a random-access iterator.
-class DepthFirstIterator: public std::iterator<std::bidirectional_iterator_tag, QModelIndex, int>
+class DepthFirstIterator
 {
     QModelIndex m_index;
     int m_column = 0;
     bool m_atEnd = false;
 
-public:
+public: //types
     struct pseudo_ptr {
         QModelIndex t;
         QModelIndex operator*()&&{return t;}
         QModelIndex* operator->(){ return &t; }
     };
 
-    DepthFirstIterator(const QModelIndex& index, int column = 0);
-    inline DepthFirstIterator(const DepthFirstIterator& other) : m_index(other.m_index), m_column(other.m_column) {}
+    using iterator_category = std::bidirectional_iterator_tag;
+    using value_type = QModelIndex;
+    using difference_type = int;
+    using pointer = value_type*;
+    using reference = value_type&;
+
+public: //methods
+    explicit DepthFirstIterator(const QModelIndex& index, int column = 0);
 
     DepthFirstIterator& operator++();
     inline DepthFirstIterator operator++(int) {DepthFirstIterator tmp(*this); operator++(); return tmp;}
@@ -78,8 +84,8 @@ public:
     inline bool operator!=(const DepthFirstIterator& other) {return !operator ==(other);}
 
     inline QModelIndex operator*() {return m_atEnd ? QModelIndex() :
-                                                      m_index.sibling(m_index.row(), m_column);}
-    inline pseudo_ptr operator->() {Q_ASSERT(!m_atEnd); return pseudo_ptr{m_index.sibling(m_index.row(), m_column)};}
+                                                      m_index.siblingAtColumn(m_column);}
+    inline pseudo_ptr operator->() {Q_ASSERT(!m_atEnd); return pseudo_ptr{m_index.siblingAtColumn(m_column)};}
 
     static DepthFirstIterator begin(QAbstractItemModel *model, int column = 0);
     static DepthFirstIterator end(QAbstractItemModel *model, int column = 0);
@@ -112,28 +118,31 @@ private:
 // by using @ref ModelAdapter.
 // FlatIterator is a random-access iterator, which allows algortihms to operate in the most effecient
 // way.
-class FlatIterator: public std::iterator<std::random_access_iterator_tag, QModelIndex, int>
+class FlatIterator
 {
     QModelIndex m_index;
     bool m_atEnd = true;
 
 public: //types
-    //iterator catagory, value_type, difference_type, pointer and reference declared via std::iterator template
+    using iterator_category = std::random_access_iterator_tag;
+    using value_type = QModelIndex;
+    using difference_type = int;
+    using pointer = value_type*;
+    using reference = value_type&;
 
 public:
-    FlatIterator(const QModelIndex& index, int column = 0);
-    inline FlatIterator(const FlatIterator& other) : m_index(other.m_index), m_atEnd(other.m_atEnd) {}
+    explicit FlatIterator(const QModelIndex& index, int column = 0);
 
-    FlatIterator& operator+=(int step);
-    FlatIterator& operator-=(int step);
-    inline FlatIterator operator+(int step) {FlatIterator tmp(*this); tmp += step; return tmp;}
-    inline FlatIterator operator-(int step) {FlatIterator tmp(*this); tmp -= step; return tmp;}
+    FlatIterator& operator+=(difference_type step);
+    FlatIterator& operator-=(difference_type step);
+    inline FlatIterator operator+(difference_type step) {FlatIterator tmp(*this); tmp += step; return tmp;}
+    inline FlatIterator operator-(difference_type step) {FlatIterator tmp(*this); tmp -= step; return tmp;}
 
     inline FlatIterator& operator++() {return operator+=(1);}
     inline FlatIterator operator++(int) {FlatIterator tmp(*this); operator++(); return tmp;}
     inline FlatIterator& operator--() {return operator-=(1);}
     inline FlatIterator operator--(int) {FlatIterator tmp(*this); operator--(); return tmp;}
-    inline int operator-(const FlatIterator& other) {Q_ASSERT(canCompare(*this, other)); return row() - other.row();}
+    inline difference_type operator-(const FlatIterator& other) const {Q_ASSERT(canCompare(*this, other)); return row() - other.row();}
 
     inline bool operator==(const FlatIterator& other) {return m_index == other.m_index && m_atEnd == other.m_atEnd;}
     inline bool operator!=(const FlatIterator& other) {return !operator==(other);}
@@ -179,6 +188,7 @@ public: //types
         inline T* operator->(){return &t;}
         inline operator T() {return t;}
         inline void operator=(const T &newValue) {const_cast<QAbstractItemModel*>(index.model())->setData(index, QVariant::fromValue(newValue), role);}
+        template <typename ComparedType> inline bool operator==(const ComparedType& value) const {return t == value;}
     };
 
     using value_type = T;
@@ -188,7 +198,7 @@ public: //types
     using difference_type = typename ModelIterator::difference_type;
 
 public: //methods
-    DataValueWrapper(ModelIterator it): it(it){}
+    explicit DataValueWrapper(ModelIterator it): it(it){}
 
     DataValueWrapper& operator+=(int step) {it+= step; return *this;}
     DataValueWrapper& operator-=(int step) {it-= step; return *this;}
@@ -206,6 +216,7 @@ public: //methods
     inline friend bool operator>(const DataValueWrapper& lhs, const DataValueWrapper& rhs) {return lhs.it > rhs.it;}
     inline friend bool operator<=(const DataValueWrapper& lhs, const DataValueWrapper& rhs) {return lhs.it <= rhs.it;}
     inline friend bool operator>=(const DataValueWrapper& lhs, const DataValueWrapper& rhs) {return lhs.it >= rhs.it;}
+    inline difference_type operator-(const DataValueWrapper& other) const {return this->it - other.it;}
 
     inline pseudo_val operator*()  {return pseudo_val{(*it)};}
     inline pseudo_val operator->() {return pseudo_val{(*it)};}
@@ -227,7 +238,7 @@ public: //methods
 //
 // Pass the model and optionally column as the constructor arguments.The default column is column 0.
 //
-// General wrapper that returns iterators that dereference to T for role role
+// General wrapper that returns iterators that dereference to T for the specified role
 template <typename ModelIterator, typename T = void, int role = Qt::DisplayRole>
 class ModelAdapter
 {
@@ -238,7 +249,7 @@ public: //types
     using const_iterator = Wrapper;
 
 public:
-    ModelAdapter(QAbstractItemModel *model, int column = 0) : m_model(model), m_column(column) {}
+    explicit ModelAdapter(QAbstractItemModel *model, int column = 0) : m_model(model), m_column(column) {}
 
     Wrapper begin() const {return Wrapper::begin(m_model, m_column);}
     Wrapper end() const {return Wrapper::end(m_model, m_column);}
@@ -260,7 +271,7 @@ public: //types
     using const_iterator = ModelIterator;
 
 public:
-    ModelAdapter(QAbstractItemModel *model, int column = 0) : m_model(model), m_column(column) {}
+    explicit ModelAdapter(QAbstractItemModel *model, int column = 0) : m_model(model), m_column(column) {}
 
     ModelIterator begin() const {return ModelIterator::begin(m_model, m_column);}
     ModelIterator end() const {return ModelIterator::end(m_model, m_column);}

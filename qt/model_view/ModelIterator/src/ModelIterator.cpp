@@ -1,7 +1,7 @@
 /****************************************************************************
 **                                MIT License
 **
-** Copyright (c) 2018-2019 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+** Copyright (C) 2018-2020 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
 ** Author: André Somers <andre.somers@kdab.com>
 **
 ** This file is part of KDToolBox (https://github.com/KDAB/KDToolBox).
@@ -30,11 +30,8 @@
 DepthFirstIterator::DepthFirstIterator(const QModelIndex &index, int column):
     m_column(column)
 {
-    if (column == 0) {
-        m_index = index;
-    } else {
-        m_index = index.sibling(index.row(), 0);
-    }
+    m_index = index.siblingAtColumn(0);
+    m_atEnd = !index.isValid();
 }
 
 DepthFirstIterator &DepthFirstIterator::operator++()
@@ -69,14 +66,15 @@ DepthFirstIterator &DepthFirstIterator::operator++()
 
 DepthFirstIterator &DepthFirstIterator::operator--()
 {
+    Q_ASSERT(m_index.isValid()); // we cannot decrement from an invalid iterator
+
     if (m_atEnd) {
         m_atEnd = false;
     } else {
         //we cannot iterate backwards from the first node in the tree
         Q_ASSERT(m_index.parent().isValid() || m_index.row() > 0);
 
-        auto index = m_index;
-        auto sibling = prevSibling(m_index);
+        const auto sibling = prevSibling(m_index);
         if (!sibling.isValid()) {
             m_index = m_index.parent();
         } else {
@@ -105,8 +103,9 @@ const QModelIndex DepthFirstIterator::prevSibling(const QModelIndex &index) cons
 
 const QModelIndex DepthFirstIterator::lastDecendant(const QModelIndex &index) const
 {
-    if (model()->hasChildren(index)) {
-        auto lastChild = model()->index(model()->rowCount(index) -1, 0, index);
+    const auto m = model();
+    if (m && m->hasChildren(index)) {
+        auto lastChild = model()->index(m->rowCount(index) -1, 0, index);
         return lastDecendant(lastChild);
     } else {
         return index;
@@ -123,12 +122,10 @@ DepthFirstIterator DepthFirstIterator::begin(QAbstractItemModel *model, int colu
 
 DepthFirstIterator DepthFirstIterator::end(QAbstractItemModel *model, int column)
 {
-    Q_ASSERT(model);
-    Q_ASSERT(model->columnCount() > column);
-
     DepthFirstIterator it = begin(model, column);
     it.m_index = it.lastDecendant(QModelIndex());
     it.m_atEnd = true;
+
     return it;
 }
 
@@ -136,9 +133,8 @@ DepthFirstIterator DepthFirstIterator::end(QAbstractItemModel *model, int column
 
 FlatIterator::FlatIterator(const QModelIndex &index, int column)
 {
-    Q_ASSERT(index.isValid());
-    m_index = index.model()->index(index.row(), column, index.parent());
-    m_atEnd = false;
+    m_index = index.siblingAtColumn(column);
+    m_atEnd = !index.isValid();
 }
 
 FlatIterator &FlatIterator::operator+=(int step)
@@ -168,6 +164,8 @@ FlatIterator &FlatIterator::operator-=(int step)
         return operator +=(-step);
 
     if (m_atEnd) --step;
+
+    Q_ASSERT(m_index.isValid());
 
     const auto newRow = m_index.row() - step;
     Q_ASSERT(newRow >= 0);

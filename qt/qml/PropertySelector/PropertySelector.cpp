@@ -1,7 +1,7 @@
 /****************************************************************************
 **                                MIT License
 **
-** Copyright (c) 2018-2019 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+** Copyright (C) 2018-2020 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
 ** Author: André Somers <andre.somers@kdab.com>
 **
 ** This file is part of KDToolBox (https://github.com/KDAB/KDToolBox).
@@ -84,7 +84,7 @@ using namespace cpp::qmltypes;
   In the examples above, we have four different Rules all specifying the same Target Property
   `color` for different Conditions. The rules to determine which Rule is used when are as
   follows: For any Target Property, the rule with the highest number of properties that are
-  all fulfilled is applied. If there are more rules that have the same number of of fulfilled
+  all fulfilled is applied. If there are more rules that have the same number of fulfilled
   properties, the rule specified last will be applied.
 
   In the example above, the rule without any conditions specifying a Value Binding `#dddddd`
